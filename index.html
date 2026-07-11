@@ -1239,13 +1239,6 @@
             const input = document.getElementById('free-input').value.trim();
             if (!input) { alert("내용을 먼저 입력해 주세요!"); return; }
 
-            const workerUrl = localStorage.getItem('cfWorkerUrl') || 'https://broadcast.365361.workers.dev';
-            if (!workerUrl) {
-                alert("⚙️ 설정에서 Cloudflare Worker URL을 먼저 입력해 주세요.");
-                toggleSettingsPanel();
-                return;
-            }
-
             const riskLabels = checkPrivacyRisk(input);
             const warningShown = showPrivacyWarning(riskLabels);
             if (warningShown && !window.__privacyConfirmed) {
@@ -1272,19 +1265,25 @@
 안내할 내용:
 ${input}`;
 
+            const GEMINI_KEY = 'AQ.Ab8RN6J2c5axNXls2rsxwh8TQ7T390Ulko0pfdtcp9YD-MuPwA';
+
             try {
-                const response = await fetch(workerUrl, {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
                 });
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error?.message || `HTTP ${response.status}`);
+                }
 
                 const data = await response.json();
-                if (data.error) throw new Error(data.error);
-
-                const text = data.result?.trim();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
                 if (!text) throw new Error("응답이 비어 있습니다.");
 
                 generatedText = text;
@@ -1295,7 +1294,7 @@ ${input}`;
 
             } catch(e) {
                 console.error(e);
-                alert(`생성 실패: ${e.message}\n\nWorker URL을 다시 확인해 주세요.`);
+                alert(`생성 실패: ${e.message}`);
             } finally {
                 btn.textContent = '🤖 AI로 방송문 만들기';
                 btn.disabled = false;
