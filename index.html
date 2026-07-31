@@ -1010,7 +1010,7 @@
                     statusDisplay.textContent = `기록 재생 완료: ${record.title}`;
                 });
             } else {
-                statusDisplay.textContent = `ℹ️ 이 기록(${record.title})은 방송문 텍스트가 없어 TTS 재생이 불가합니다.`;
+                statusDisplay.textContent = `📁 ${record.title} (${record.date} ${record.time}) — 음성파일은 다시 불러와서 재생해 주세요.`;
             }
         }
 
@@ -1195,8 +1195,6 @@
             uploadedAudioName = file.name;
             uploadedAudioBuffer = null;
 
-            // FileReader로 ArrayBuffer 읽은 후 Web Audio API로 디코딩
-            // <audio> 태그를 전혀 사용하지 않으므로 WebView 코덱 제한 우회 가능
             const reader = new FileReader();
             reader.onload = function(e) {
                 const ctx = getAudioContext();
@@ -1205,7 +1203,12 @@
                     function(buffer) {
                         uploadedAudioBuffer = buffer;
                         nameDisplay.textContent = `✅ 불러옴: ${file.name}`;
-                        statusDisplay.textContent = `✅ [${file.name}] 준비 완료 — 하단 재생 버튼을 눌러주세요`;
+                        statusDisplay.textContent = `✅ [${file.name}] 준비 완료 — 재생 버튼을 눌러주세요`;
+                        // 파일 불러오기 완료 후 패널 자동 닫기
+                        closeAllPanels();
+                        // 버튼 선택 해제
+                        document.querySelectorAll('.container .btn').forEach(btn => btn.classList.remove('selected'));
+                        selectedButton = null;
                     },
                     function(err) {
                         nameDisplay.textContent = `❌ 디코딩 실패: ${file.name}`;
