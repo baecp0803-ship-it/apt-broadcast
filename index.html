@@ -1041,12 +1041,14 @@
         }
 
         window.selectTopic = function(buttonElement) {
-            // 다른 패널(방송문 작성/파일 업로드)이 열려 있었다면 모두 닫고, 사전 녹음 주제 선택 상태로 전환
             closeAllPanels();
             const allButtons = document.querySelectorAll('.container .btn');
             allButtons.forEach(btn => btn.classList.remove('selected'));
             selectedButton = buttonElement;
             selectedButton.classList.add('selected');
+            // 다른 카테고리 선택 시 음성파일 버퍼 초기화
+            uploadedAudioBuffer = null;
+            uploadedAudioName = '';
             if (isPlaying) { stopBroadcast(); } else { updateStatusText(); }
         }
 
