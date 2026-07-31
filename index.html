@@ -1202,13 +1202,15 @@
                     e.target.result.slice(0),
                     function(buffer) {
                         uploadedAudioBuffer = buffer;
-                        nameDisplay.textContent = `✅ 불러옴: ${file.name}`;
                         statusDisplay.textContent = `✅ [${file.name}] 준비 완료 — 재생 버튼을 눌러주세요`;
-                        // 파일 불러오기 완료 후 패널 자동 닫기
+                        // 파일 불러오기 완료 후 패널 닫기 및 내용 초기화
                         closeAllPanels();
-                        // 버튼 선택 해제
                         document.querySelectorAll('.container .btn').forEach(btn => btn.classList.remove('selected'));
                         selectedButton = null;
+                        // 패널 내부 초기화 (다음에 다시 열면 깨끗하게)
+                        nameDisplay.textContent = '';
+                        nameDisplay.classList.remove('show');
+                        document.getElementById('audio-file-input').value = '';
                     },
                     function(err) {
                         nameDisplay.textContent = `❌ 디코딩 실패: ${file.name}`;
