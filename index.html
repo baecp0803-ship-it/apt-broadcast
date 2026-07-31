@@ -755,7 +755,7 @@
 
             <!-- 결과 -->
             <div id="ai-result-area" style="display:none; margin-top:14px;">
-                <div class="result-box show" id="result-box" style="display:block; white-space:pre-wrap;"></div>
+                <textarea class="result-box show" id="result-box" style="display:block; width:100%; min-height:180px; resize:vertical; font-family:inherit; font-size:14px; line-height:1.7; padding:14px; border:1.5px dashed #94a3b8; border-radius:12px; background:#f8fafc; color:#1e293b;" oninput="generatedText=this.value"></textarea>
                 <div class="result-controls show" id="result-controls" style="display:flex; margin-top:10px;">
                     <button class="btn-listen" id="listen-btn" onclick="applyAndListen()">🔊 들어보기</button>
                     <button class="btn-copy" onclick="copyResultInput()">📋 복사</button>
@@ -1438,7 +1438,7 @@
             }
 
             generatedText = result;
-            document.getElementById('result-box').textContent = result;
+            document.getElementById('result-box').value = result;
             document.getElementById('ai-result-area').style.display = 'block';
             statusDisplay.textContent = "✅ 방송문 완성! 수정 후 메인 탭에서 재생하세요.";
             saveBroadcastRecord('방송문', result, 'tts');
@@ -1446,7 +1446,7 @@
 
         window.resetAIResult = function() {
             document.getElementById('ai-result-area').style.display = 'none';
-            document.getElementById('result-box').textContent = '';
+            document.getElementById('result-box').value = '';
             generatedText = '';
             stopSpeaking();
         }
@@ -1457,7 +1457,12 @@
             generatedText = text;
 
             if (isSpeaking) { stopSpeaking(); return; }
-            if (!('speechSynthesis' in window)) { alert("이 기기는 음성 읽기를 지원하지 않습니다."); return; }
+
+            // AndroidTTS 또는 Web Speech API 둘 다 없으면 안내
+            if (!window.NativeApp && !window.AndroidTTS && !('speechSynthesis' in window)) {
+                alert("이 기기는 음성 읽기를 지원하지 않습니다.");
+                return;
+            }
 
             isSpeaking = true;
             const btn = document.getElementById('listen-btn');
@@ -1502,21 +1507,40 @@
 
         // 브라우저 내장 음성합성(Web Speech API)으로 완성된 방송문을 바로 읽어줌
         // 별도 설치/서버 없이 안드로이드 크롬 등에서 즉시 작동
+        // NativeApp 브릿지 콜백 (안드로이드에서 호출)
+        window.onNativeTTSDone = function() {
+            isSpeaking = false;
+            const btn = document.getElementById('listen-btn');
+            if (btn) { btn.classList.remove('active'); btn.innerHTML = "🔊 들어보기"; }
+            if (window._ttsOnEnd) { window._ttsOnEnd(); window._ttsOnEnd = null; }
+        }
+
+        window.onNativeAudioDone = function() {
+            isPlaying = false;
+            uploadedIsPlaying = false;
+            mainPlayBtn.classList.remove('active');
+            mainPlayBtn.innerHTML = '▶ 재생 시작';
+            updateStatusText();
+        }
+
+        window.onNativeAudioError = function(msg) {
+            alert('음원 재생 오류: ' + msg);
+            statusDisplay.textContent = "상태: 방송할 주제를 선택해 주세요.";
+        }
+
         // 문장을 마침표 기준으로 나눠서 순서대로 읽는 TTS 함수
         function speakBysentences(text, onEnd) {
             const rate = parseFloat(speedSelect.value);
 
-            // 안드로이드 네이티브 TTS 우선 사용
-            if (window.AndroidTTS) {
-                window.AndroidTTS.speak(text, rate);
-                // 재생 완료 폴링 (500ms마다 확인)
-                const checkDone = setInterval(() => {
-                    if (!window.AndroidTTS.isSpeaking()) {
-                        clearInterval(checkDone);
-                        isSpeaking = false;
-                        if (onEnd) onEnd();
-                    }
-                }, 500);
+            // 안드로이드 네이티브 TTS (문장 분리 후 네이티브에서 처리)
+            if (window.NativeApp) {
+                const sentences = text
+                    .split(/(?<=[.!?])\s+/)
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                window._ttsOnEnd = onEnd;
+                const json = JSON.stringify(sentences);
+                window.NativeApp.ttsSpeakSentences(json, rate);
                 return;
             }
 
@@ -1558,7 +1582,7 @@
             }
             if (!generatedText) return;
 
-            if (!('speechSynthesis' in window)) {
+            if (!window.NativeApp && !window.AndroidTTS && !('speechSynthesis' in window)) {
                 alert("이 브라우저는 음성 읽기 기능을 지원하지 않습니다.");
                 return;
             }
@@ -1574,8 +1598,9 @@
         }
 
         function stopSpeaking() {
-            if (window.AndroidTTS) window.AndroidTTS.stop();
-            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (window.NativeApp) window.NativeApp.ttsStop();
+            else if (window.AndroidTTS) window.AndroidTTS.stop();
+            else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             isSpeaking = false;
             const btn = document.getElementById('listen-btn');
             if (btn) { btn.classList.remove('active'); btn.innerHTML = "🔊 들어보기"; }
@@ -1631,35 +1656,51 @@
                 audioSrc = selectedButton.getAttribute('data-child');
             }
 
-            // Web Audio API로 재생 (audio 태그 보안 제한 우회)
+            // 네이티브 MediaPlayer로 재생 (100% 안정적)
             const topicName = selectedButton.getAttribute('data-name');
             const modeName = currentMode === 'adult-male' ? '어른(남)' : currentMode === 'adult-female' ? '어른(여)' : '아이';
-            statusDisplay.innerHTML = `⏳ 불러오는 중: ${topicName}...`;
 
-            fetch(audioSrc)
-                .then(res => {
-                    if (!res.ok) throw new Error(`파일 없음: ${audioSrc}`);
-                    return res.arrayBuffer();
-                })
-                .then(arrayBuffer => {
-                    const ctx = getAudioContext();
-                    return ctx.decodeAudioData(arrayBuffer);
-                })
-                .then(buffer => {
-                    stopUploadedAudio();
-                    uploadedAudioBuffer = buffer;
-                    playUploadedAudio();
-                    isPlaying = true;
-                    mainPlayBtn.classList.add('active');
-                    statusDisplay.innerHTML = `🔊 재생 중: ${topicName} (${modeName} 목소리)`;
-                    mainPlayBtn.innerHTML = `⏹ 방송 중단`;
-                    saveBroadcastRecord(topicName, '', 'preset');
-                })
-                .catch(err => {
-                    console.error("재생 에러:", err);
-                    alert(`음원을 불러올 수 없습니다.\n${err.message}`);
-                    statusDisplay.textContent = "상태: 방송할 주제를 선택해 주세요.";
-                });
+            if (window.NativeApp) {
+                // 파일명만 추출 (audio/ 경로 제거)
+                const filename = audioSrc.replace('audio/', '');
+                window.NativeApp.playAudio(filename);
+                isPlaying = true;
+                mainPlayBtn.classList.add('active');
+                statusDisplay.innerHTML = `🔊 재생 중: ${topicName} (${modeName} 목소리)`;
+                mainPlayBtn.innerHTML = `⏹ 방송 중단`;
+                saveBroadcastRecord(topicName, '', 'preset');
+                return;
+            }
+
+            // 폴백: XMLHttpRequest + Web Audio API
+            statusDisplay.innerHTML = `⏳ 불러오는 중: ${topicName}...`;
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', audioSrc, true);
+            xhr.responseType = 'arraybuffer';
+            xhr.onload = function() {
+                const ctx = getAudioContext();
+                ctx.decodeAudioData(xhr.response,
+                    function(buffer) {
+                        stopUploadedAudio();
+                        uploadedAudioBuffer = buffer;
+                        playUploadedAudio();
+                        isPlaying = true;
+                        mainPlayBtn.classList.add('active');
+                        statusDisplay.innerHTML = `🔊 재생 중: ${topicName} (${modeName} 목소리)`;
+                        mainPlayBtn.innerHTML = `⏹ 방송 중단`;
+                        saveBroadcastRecord(topicName, '', 'preset');
+                    },
+                    function() {
+                        alert(`음원 디코딩 실패: ${audioSrc}`);
+                        statusDisplay.textContent = "상태: 방송할 주제를 선택해 주세요.";
+                    }
+                );
+            };
+            xhr.onerror = function() {
+                alert(`음원을 불러올 수 없습니다: ${audioSrc}`);
+                statusDisplay.textContent = "상태: 방송할 주제를 선택해 주세요.";
+            };
+            xhr.send();
         }
 
         window.changeSpeed = function(speedValue) {
@@ -1670,11 +1711,13 @@
         }
 
         window.stopBroadcast = function() {
+            if (window.NativeApp) window.NativeApp.stopAudio();
             audioPlayer.pause();
             audioPlayer.src = "";
             stopUploadedAudio();
             stopSpeaking();
             isPlaying = false;
+            uploadedIsPlaying = false;
             mainPlayBtn.classList.remove('active');
             mainPlayBtn.innerHTML = `▶ 재생 시작`;
             updateStatusText();
