@@ -1503,45 +1503,51 @@
         // 브라우저 내장 음성합성(Web Speech API)으로 완성된 방송문을 바로 읽어줌
         // 별도 설치/서버 없이 안드로이드 크롬 등에서 즉시 작동
         // 문장을 마침표 기준으로 나눠서 순서대로 읽는 TTS 함수
-        // 문장 사이에 pauseMs 만큼 쉬었다가 다음 문장을 읽음
         function speakBysentences(text, onEnd) {
             const rate = parseFloat(speedSelect.value);
-            const pitch = currentMode === 'child' ? 1.4 : currentMode === 'adult-female' ? 1.15 : 0.9;
 
-            // 마침표, 느낌표, 물음표 기준으로 문장 분리 (빈 문장 제거)
+            // 안드로이드 네이티브 TTS 우선 사용
+            if (window.AndroidTTS) {
+                window.AndroidTTS.speak(text, rate);
+                // 재생 완료 폴링 (500ms마다 확인)
+                const checkDone = setInterval(() => {
+                    if (!window.AndroidTTS.isSpeaking()) {
+                        clearInterval(checkDone);
+                        isSpeaking = false;
+                        if (onEnd) onEnd();
+                    }
+                }, 500);
+                return;
+            }
+
+            // Web Speech API 폴백
+            const pitch = currentMode === 'child' ? 1.4 : currentMode === 'adult-female' ? 1.15 : 0.9;
             const sentences = text
                 .split(/(?<=[.!?])\s+/)
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
 
             if (!sentences.length) return;
-
             let index = 0;
 
             function speakNext() {
-                if (!isSpeaking) return; // 중단됐으면 멈춤
-
+                if (!isSpeaking) return;
                 if (index >= sentences.length) {
                     isSpeaking = false;
                     if (onEnd) onEnd();
                     return;
                 }
-
                 const utter = new SpeechSynthesisUtterance(sentences[index]);
                 utter.lang = 'ko-KR';
                 utter.rate = rate;
                 utter.pitch = pitch;
                 if (selectedTtsVoice) utter.voice = selectedTtsVoice;
-
                 utter.onend = function() {
                     index++;
-                    // 문장 사이 0.4초 쉬었다가 다음 문장 재생
                     setTimeout(speakNext, 400);
                 };
-
                 window.speechSynthesis.speak(utter);
             }
-
             speakNext();
         }
 
@@ -1568,12 +1574,11 @@
         }
 
         function stopSpeaking() {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-            }
+            if (window.AndroidTTS) window.AndroidTTS.stop();
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             isSpeaking = false;
-            listenBtn.classList.remove('active');
-            listenBtn.innerHTML = "🔊 들어보기";
+            const btn = document.getElementById('listen-btn');
+            if (btn) { btn.classList.remove('active'); btn.innerHTML = "🔊 들어보기"; }
         }
 
         // ---------------------------------------------------------
