@@ -888,21 +888,7 @@
             document.getElementById('complex-name-input').value = savedName;
             updateComplexNameBar(savedName);
 
-            // TTS 음성: 구글 한국어를 기본으로 자동 설정
-            const setGoogleKoreanVoice = () => {
-                const voices = window.speechSynthesis.getVoices();
-                // 구글 한국어 우선, 없으면 한국어 아무거나
-                selectedTtsVoice =
-                    voices.find(v => v.name.toLowerCase().includes('google') && v.lang.startsWith('ko')) ||
-                    voices.find(v => v.lang.startsWith('ko')) ||
-                    null;
-            };
-            if (window.speechSynthesis.getVoices().length) {
-                setGoogleKoreanVoice();
-            } else {
-                window.speechSynthesis.onvoiceschanged = setGoogleKoreanVoice;
-            }
-
+            // TTS 음성: 기기 기본값 사용 (별도 선택 없음)
             // 저장된 방송 기록 복원
             try {
                 broadcastHistory = JSON.parse(localStorage.getItem('broadcastHistory') || '[]');
