@@ -1541,10 +1541,9 @@
                 }
             }
 
-            // 내 음성파일을 불러온 상태라면 → Web Audio API로 재생
-            // 재생 전 반드시 기존 재생 중인 것을 먼저 중단해서 겹침 방지
-            if (uploadedAudioBuffer) {
-                stopUploadedAudio(); // 혹시 이전 재생이 남아있다면 확실히 중단
+            // 내 음성파일을 불러온 상태이고 카테고리 버튼이 선택되지 않은 경우만 재생
+            if (uploadedAudioBuffer && !selectedButton) {
+                stopUploadedAudio();
                 try {
                     playUploadedAudio();
                     isPlaying = true;
