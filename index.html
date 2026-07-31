@@ -111,6 +111,7 @@
         body.adult-female-mode .mode-btn.adult-female { background: #9333ea; color: white; }
         body.child-mode { background-color: #fffbeb; }
         body.child-mode .mode-btn.child { background: #f59e0b; color: white; }
+        body.child-mode .child-hide { display: none !important; }
 
         /* 5개 카테고리 안내방송 버튼 (기존 4개 + 방송문 작성) */
         .container { 
@@ -150,8 +151,7 @@
             background-color: #eff6ff;
             border-color: #2563eb;
             color: #1d4ed8;
-        }
-        body.adult-male-mode .btn.upload-btn.selected, body.adult-female-mode .btn.upload-btn.selected { border-color: #2563eb; background-color: #dbeafe; color: #1d4ed8; }
+        }        body.adult-male-mode .btn.upload-btn.selected, body.adult-female-mode .btn.upload-btn.selected { border-color: #2563eb; background-color: #dbeafe; color: #1d4ed8; }
         body.child-mode .btn.upload-btn.selected { border-color: #2563eb; background-color: #dbeafe; color: #1d4ed8; }
 
         .upload-hint {
@@ -404,7 +404,6 @@
 
         /* 기록 버튼 */
         .btn.history-btn {
-            grid-column: 1 / -1;
             background-color: #fdf4ff;
             border-color: #a855f7;
             color: #7e22ce;
@@ -641,7 +640,7 @@
 <body class="adult-male-mode"> 
 
     <div class="header">
-        <span class="header-title">📢 KOHOM 스마트 안내방송</span>
+        <span class="header-title" style="padding-top:10px; display:block;">📢 KOHOM 스마트 안내방송</span>
         <button class="header-settings-btn" id="header-settings-btn" onclick="toggleSettingsPanel()" title="설정">⚙️</button>
     </div>
     <div class="complex-name-bar" id="complex-name-bar"></div>
@@ -668,22 +667,23 @@
                     data-adult-female="audio/간접흡연_여_미진.mp3"
                     data-child="audio/간접흡연_아이.mp3"
                     onclick="selectTopic(this)">🚬 간접흡연 방지</button>
-                <button class="btn" id="btn-noise" data-name="층간소음 자제"
+                <button class="btn child-hide" id="btn-noise" data-name="층간소음 자제"
                     data-adult-male="audio/층간소음_남_주안.mp3"
                     data-adult-female="audio/층간소음_여_미진.mp3"
                     data-child="audio/층간소음_남_주안.mp3"
                     onclick="selectTopic(this)">🤫 층간소음 자제</button>
-                <button class="btn" id="btn-pet" data-name="펫티켓 준수"
+                <button class="btn child-hide" id="btn-pet" data-name="펫티켓 준수"
                     data-adult-male="audio/펫티켓_남자_주안.mp3"
                     data-adult-female="audio/펫티켓_여자_미진.mp3"
                     data-child="audio/펫티켓_남자_주안.mp3"
                     onclick="selectTopic(this)">🐶 펫티켓 준수</button>
-                <button class="btn" id="btn-throw" data-name="물건투척 금지"
+                <button class="btn child-hide" id="btn-throw" data-name="물건투척 금지"
                     data-adult-male="audio/물건투척_남_주안.mp3"
                     data-adult-female="audio/물건투척_여_미진.mp3"
                     data-child="audio/물건투척_남_주안.mp3"
                     onclick="selectTopic(this)">📦 물건투척 금지</button>
                 <button class="btn upload-btn" id="btn-upload" onclick="toggleUploadPanel()">🎵 내 음성파일 재생</button>
+                <button class="btn history-btn" id="btn-history" onclick="toggleHistoryPanel()">📋 방송 기록</button>
             </div>
 
             <!-- 컨트롤: 카테고리 버튼 바로 아래 -->
@@ -712,7 +712,6 @@
             </div>
 
             <!-- 방송 기록 -->
-            <button class="btn history-btn" id="btn-history" onclick="toggleHistoryPanel()" style="width:100%;margin-top:14px;">📋 방송 기록</button>
             <div class="write-panel" id="history-panel">
                 <h3>📋 방송 기록</h3>
                 <div id="history-list"><div class="history-empty">아직 방송 기록이 없습니다.</div></div>
@@ -780,6 +779,18 @@
                 <input type="text" id="complex-name-input" placeholder="예: 행복마을 1단지, 주공아파트">
             </div>
             <button class="settings-save-btn" onclick="saveSettings()">💾 저장</button>
+        </div>
+    </div>
+
+    <!-- 방송 기록 전체화면 뷰 -->
+    <div class="settings-view" id="history-view">
+        <div class="settings-topbar">
+            <button class="settings-back-btn" onclick="closeHistoryView()">◀</button>
+            <span class="settings-topbar-title">📋 방송 기록</span>
+        </div>
+        <div class="settings-body">
+            <div id="history-list-view"><div class="history-empty">아직 방송 기록이 없습니다.</div></div>
+            <button class="history-clear-btn" onclick="clearHistory()" style="margin-top:12px;">🗑️ 기록 전체 삭제</button>
         </div>
     </div>
 
@@ -1003,6 +1014,7 @@
             broadcastHistory = [];
             localStorage.removeItem('broadcastHistory');
             renderHistoryList();
+            renderHistoryListView();
             statusDisplay.textContent = "방송 기록이 삭제되었습니다.";
         }
 
@@ -1015,6 +1027,11 @@
                 document.body.className = 'adult-female-mode';
             } else {
                 document.body.className = 'child-mode';
+                // 아이 모드에서 숨겨진 버튼이 선택된 경우 해제
+                if (selectedButton && selectedButton.classList.contains('child-hide')) {
+                    selectedButton.classList.remove('selected');
+                    selectedButton = null;
+                }
             }
             updateStatusText();
         }
@@ -1068,23 +1085,65 @@
         }
 
         // ---------------------------------------------------------
-        // 방송 기록 카테고리
+        // 방송 기록 전체화면 전환
         // ---------------------------------------------------------
         window.toggleHistoryPanel = function() {
-            const allButtons = document.querySelectorAll('.container .btn');
-            allButtons.forEach(btn => btn.classList.remove('selected'));
-            document.getElementById('btn-history').classList.add('selected');
-            selectedButton = null;
+            const dashboard = document.querySelector('.dashboard');
+            const historyView = document.getElementById('history-view');
             stopBroadcast();
-            const isOpen = historyPanel.classList.contains('open');
             closeAllPanels();
-            if (!isOpen) {
-                historyPanel.classList.add('open');
-                renderHistoryList();
-                statusDisplay.textContent = "상태: 기록을 눌러 다시 재생할 수 있습니다.";
-            } else {
-                updateStatusText();
+            dashboard.style.display = 'none';
+            historyView.classList.add('active');
+            renderHistoryListView();
+        }
+
+        window.closeHistoryView = function() {
+            const dashboard = document.querySelector('.dashboard');
+            const historyView = document.getElementById('history-view');
+            historyView.classList.remove('active');
+            dashboard.style.display = 'flex';
+            // 버튼 선택 해제
+            document.querySelectorAll('.container .btn').forEach(btn => btn.classList.remove('selected'));
+            updateStatusText();
+        }
+
+        // 전체화면 기록 목록 렌더링
+        function renderHistoryListView() {
+            const container = document.getElementById('history-list-view');
+            if (!broadcastHistory.length) {
+                container.innerHTML = '<div class="history-empty">아직 방송 기록이 없습니다.</div>';
+                return;
             }
+
+            const grouped = {};
+            broadcastHistory.forEach(r => {
+                if (!grouped[r.date]) grouped[r.date] = [];
+                grouped[r.date].push(r);
+            });
+
+            container.innerHTML = '';
+            Object.keys(grouped).forEach(date => {
+                const dateHeader = document.createElement('div');
+                dateHeader.style.cssText = 'font-size:13px;font-weight:bold;color:#64748b;margin:12px 0 6px;text-align:left;';
+                dateHeader.textContent = `📅 ${date}`;
+                container.appendChild(dateHeader);
+
+                grouped[date].forEach(record => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.innerHTML = `
+                        <div class="history-item-info">
+                            <div class="history-item-title">${record.title}</div>
+                            <div class="history-item-time">${record.time} · ${record.type === 'tts' ? '방송문 TTS' : record.type === 'file' ? '음성파일' : '사전 녹음'}</div>
+                        </div>
+                        <div class="history-item-play">▶️</div>`;
+                    item.addEventListener('click', () => {
+                        replayRecord(record);
+                        closeHistoryView();
+                    });
+                    container.appendChild(item);
+                });
+            });
         }
 
         // ---------------------------------------------------------
