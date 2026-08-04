@@ -935,28 +935,12 @@
                 femaleBtn.style.background = gender === 'female' ? '#f3e8ff' : 'white';
             }
 
-            // APK: 네이티브 TTS 음성 변경
+            // APK: 네이티브 TTS 음성 변경 (실제 남/여 목소리)
             if (window.NativeApp) {
                 window.NativeApp.setVoiceGender(gender);
                 return;
             }
-
-            // 브라우저: Web Speech API 음성 선택
-            const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-            const korVoices = voices.filter(v => v.lang.startsWith('ko'));
-            if (korVoices.length > 0) {
-                let picked = null;
-                if (gender === 'female') {
-                    picked = korVoices.find(v => /female|woman|여성|여|미진|여자/i.test(v.name))
-                          || korVoices.find(v => v.name.toLowerCase().includes('google') && v.lang.startsWith('ko'))
-                          || korVoices[0];
-                } else {
-                    picked = korVoices.find(v => /male|man|남성|남|주안|남자/i.test(v.name))
-                          || korVoices[korVoices.length > 1 ? 1 : 0];
-                }
-                selectedTtsVoice = picked || null;
-            }
-            window._ttsPitch = gender === 'female' ? 1.2 : 0.85;
+            // 브라우저: pitch 조절 없이 기본 목소리 그대로 사용
         }
 
         // NativeApp에서 음성 선택 완료 콜백
@@ -1609,7 +1593,7 @@
             }
 
             // Web Speech API 폴백
-            const pitch = window._ttsPitch || (currentMode === 'child' ? 1.4 : currentMode === 'adult-female' ? 1.15 : 0.9);
+            const pitch = 1.0;
             const sentences = text
                 .split(/(?<=[.!?])\s+/)
                 .map(s => s.trim())
