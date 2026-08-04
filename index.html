@@ -1376,19 +1376,16 @@
         };
 
         window.goToMainWithBroadcast = function() {
-            // 현재 선택된 템플릿 이름 가져오기
             const activeBtn = document.querySelector('.template-btn.active');
             const activeType = activeBtn ? activeBtn.getAttribute('onclick').replace("applyTemplate('", "").replace("')", "") : null;
             const templateName = activeType && activeType !== '직접입력' ? activeType : '방송문';
-
             switchTab('main');
-
             if (generatedText) {
                 statusDisplay.textContent = `대기: [${templateName}] 하단 재생 버튼을 눌러 방송하세요.`;
             }
         }
 
-
+        window.applyTemplate = function(type) {
             document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
 
