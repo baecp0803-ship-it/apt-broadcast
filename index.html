@@ -779,8 +779,16 @@
         </div>
         <div class="settings-body">
             <div class="settings-row">
-                <label>단지 이름 (방송문 앞에 자동으로 포함됩니다)</label>
+                <label>단지 이름</label>
                 <input type="text" id="complex-name-input" placeholder="예: 행복마을 1단지, 주공아파트">
+            </div>
+            <div class="settings-row">
+                <label>TTS 방송 목소리</label>
+                <div style="display:flex; gap:10px; margin-top:6px;">
+                    <button id="tts-voice-male" onclick="setTtsGender('male')" style="flex:1; padding:12px; border:2px solid #cbd5e1; border-radius:10px; background:white; font-size:14px; font-weight:bold; cursor:pointer;">👨 남성</button>
+                    <button id="tts-voice-female" onclick="setTtsGender('female')" style="flex:1; padding:12px; border:2px solid #cbd5e1; border-radius:10px; background:white; font-size:14px; font-weight:bold; cursor:pointer;">👩 여성</button>
+                </div>
+                <div style="margin-top:6px; font-size:12px; color:#64748b;">기기에 설치된 TTS 엔진에 따라 목소리가 다를 수 있습니다.</div>
             </div>
             <button class="settings-save-btn" onclick="saveSettings()">💾 저장</button>
         </div>
@@ -903,7 +911,10 @@
             document.getElementById('complex-name-input').value = savedName;
             updateComplexNameBar(savedName);
 
-            // TTS 음성: 기기 기본값 사용 (별도 선택 없음)
+            // TTS 성별 설정 복원
+            const savedGender = localStorage.getItem('ttsGender') || 'female';
+            setTtsGender(savedGender, true);
+
             // 저장된 방송 기록 복원
             try {
                 broadcastHistory = JSON.parse(localStorage.getItem('broadcastHistory') || '[]');
@@ -911,7 +922,41 @@
             renderHistoryList();
         }
 
-        // 단지명 바 업데이트 (헤더 아래 표시)
+        // TTS 성별 선택
+        window.setTtsGender = function(gender, init = false) {
+            localStorage.setItem('ttsGender', gender);
+
+            const maleBtn = document.getElementById('tts-voice-male');
+            const femaleBtn = document.getElementById('tts-voice-female');
+            if (maleBtn && femaleBtn) {
+                maleBtn.style.borderColor = gender === 'male' ? '#1e3a8a' : '#cbd5e1';
+                maleBtn.style.background = gender === 'male' ? '#eff6ff' : 'white';
+                femaleBtn.style.borderColor = gender === 'female' ? '#9333ea' : '#cbd5e1';
+                femaleBtn.style.background = gender === 'female' ? '#f3e8ff' : 'white';
+            }
+
+            // 목소리 선택: 기기에 설치된 TTS 음성 중 성별에 맞는 것 선택
+            const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+            const korVoices = voices.filter(v => v.lang.startsWith('ko'));
+
+            if (korVoices.length > 0) {
+                let picked = null;
+                if (gender === 'female') {
+                    picked = korVoices.find(v => /female|woman|여성|여|미진|여자/i.test(v.name))
+                          || korVoices.find(v => v.name.toLowerCase().includes('google') && v.lang.startsWith('ko'))
+                          || korVoices[0];
+                } else {
+                    picked = korVoices.find(v => /male|man|남성|남|주안|남자/i.test(v.name))
+                          || korVoices[korVoices.length > 1 ? 1 : 0];
+                }
+                selectedTtsVoice = picked || null;
+            }
+
+            // NativeApp(APK)에서는 pitch로 성별 구분
+            window._ttsPitch = gender === 'female' ? 1.2 : 0.85;
+        }
+
+
         function updateComplexNameBar(name) {
             const bar = document.getElementById('complex-name-bar');
             if (name) {
@@ -928,6 +973,7 @@
             const complexName = document.getElementById('complex-name-input').value.trim();
             localStorage.setItem('complexName', complexName);
             updateComplexNameBar(complexName);
+            // TTS 성별은 setTtsGender에서 이미 저장됨
 
 
             const btn = document.querySelector('.settings-save-btn');
@@ -1555,7 +1601,7 @@
             }
 
             // Web Speech API 폴백
-            const pitch = currentMode === 'child' ? 1.4 : currentMode === 'adult-female' ? 1.15 : 0.9;
+            const pitch = window._ttsPitch || (currentMode === 'child' ? 1.4 : currentMode === 'adult-female' ? 1.15 : 0.9);
             const sentences = text
                 .split(/(?<=[.!?])\s+/)
                 .map(s => s.trim())
@@ -1620,21 +1666,31 @@
         // 기존 사전 녹음 방송 재생 (4개 카테고리)
         // ---------------------------------------------------------
         window.startBroadcast = function() {
-            // 재생 중이면 중단 (재생 버튼을 다시 눌렀을 때)
+            // 재생 중이면 중단
             if (isPlaying || uploadedIsPlaying || isSpeaking) {
                 stopBroadcast();
                 return;
             }
 
-            // 방송문 작성 탭에서 완성된 방송문이 있으면 TTS로 재생
-            if (generatedText && (currentTab === 'write' || currentTab === 'main')) {
-                if (generatedText && currentTab === 'main' && !selectedButton && !uploadedAudioBuffer) {
-                    toggleListen();
-                    isPlaying = true;
-                    mainPlayBtn.classList.add('active');
-                    mainPlayBtn.innerHTML = `⏹ 방송 중단`;
-                    return;
-                }
+            // 방송문 작성에서 만든 방송문이 있고 카테고리 버튼이 선택되지 않은 경우 TTS 재생
+            if (generatedText && !selectedButton && !uploadedAudioBuffer) {
+                isSpeaking = true;
+                isPlaying = true;
+                mainPlayBtn.classList.add('active');
+                mainPlayBtn.innerHTML = `⏹ 방송 중단`;
+                const activeBtn = document.querySelector('.template-btn.active');
+                const activeType = activeBtn ? activeBtn.getAttribute('onclick').replace("applyTemplate('", "").replace("')", "") : null;
+                const templateName = activeType && activeType !== '직접입력' ? activeType : '방송문';
+                statusDisplay.textContent = `🔊 재생 중: ${templateName}`;
+                speakBysentences(generatedText, () => {
+                    isSpeaking = false;
+                    isPlaying = false;
+                    mainPlayBtn.classList.remove('active');
+                    mainPlayBtn.innerHTML = `▶ 재생 시작`;
+                    statusDisplay.textContent = `대기: [${templateName}] 하단 재생 버튼을 눌러 방송하세요.`;
+                });
+                saveBroadcastRecord(templateName, generatedText, 'tts');
+                return;
             }
 
             // 내 음성파일을 불러온 상태이고 카테고리 버튼이 선택되지 않은 경우만 재생
