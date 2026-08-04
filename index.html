@@ -761,7 +761,7 @@
                     <button class="btn-copy" onclick="copyResultInput()">📋 복사</button>
                     <button class="btn-edit" onclick="resetAIResult()">✏️ 다시 작성</button>
                 </div>
-                <button onclick="switchTab('main')" style="width:100%; margin-top:10px; padding:14px; background:#1e3a8a; color:white; border:none; border-radius:12px; font-size:15px; font-weight:bold; cursor:pointer;">▶ 메인에서 방송하기</button>
+                <button onclick="goToMainWithBroadcast()" style="width:100%; margin-top:10px; padding:14px; background:#1e3a8a; color:white; border:none; border-radius:12px; font-size:15px; font-weight:bold; cursor:pointer;">▶ 메인에서 방송하기</button>
             </div>
 
             <textarea id="result-input" style="display:none;"></textarea>
@@ -1375,7 +1375,20 @@
             '직접입력': { when: '', where: '', what: '', extra: '', full: null }
         };
 
-        window.applyTemplate = function(type) {
+        window.goToMainWithBroadcast = function() {
+            // 현재 선택된 템플릿 이름 가져오기
+            const activeBtn = document.querySelector('.template-btn.active');
+            const activeType = activeBtn ? activeBtn.getAttribute('onclick').replace("applyTemplate('", "").replace("')", "") : null;
+            const templateName = activeType && activeType !== '직접입력' ? activeType : '방송문';
+
+            switchTab('main');
+
+            if (generatedText) {
+                statusDisplay.textContent = `대기: [${templateName}] 하단 재생 버튼을 눌러 방송하세요.`;
+            }
+        }
+
+
             document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
 
