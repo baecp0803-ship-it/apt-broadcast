@@ -935,10 +935,15 @@
                 femaleBtn.style.background = gender === 'female' ? '#f3e8ff' : 'white';
             }
 
-            // 목소리 선택: 기기에 설치된 TTS 음성 중 성별에 맞는 것 선택
+            // APK: 네이티브 TTS 음성 변경
+            if (window.NativeApp) {
+                window.NativeApp.setVoiceGender(gender);
+                return;
+            }
+
+            // 브라우저: Web Speech API 음성 선택
             const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
             const korVoices = voices.filter(v => v.lang.startsWith('ko'));
-
             if (korVoices.length > 0) {
                 let picked = null;
                 if (gender === 'female') {
@@ -951,9 +956,12 @@
                 }
                 selectedTtsVoice = picked || null;
             }
-
-            // NativeApp(APK)에서는 pitch로 성별 구분
             window._ttsPitch = gender === 'female' ? 1.2 : 0.85;
+        }
+
+        // NativeApp에서 음성 선택 완료 콜백
+        window.onVoiceSelected = function(voiceName) {
+            console.log('선택된 TTS 음성:', voiceName);
         }
 
 
