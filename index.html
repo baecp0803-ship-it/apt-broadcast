@@ -1417,7 +1417,14 @@
             const activeBtn = document.querySelector('.template-btn.active');
             const activeType = activeBtn ? activeBtn.getAttribute('onclick').replace("applyTemplate('", "").replace("')", "") : null;
             const templateName = activeType && activeType !== '직접입력' ? activeType : '방송문';
+
+            // 카테고리 버튼 선택 해제 (generatedText가 재생되도록)
+            document.querySelectorAll('.container .btn').forEach(btn => btn.classList.remove('selected'));
+            selectedButton = null;
+            uploadedAudioBuffer = null;
+
             switchTab('main');
+
             if (generatedText) {
                 statusDisplay.textContent = `대기: [${templateName}] 하단 재생 버튼을 눌러 방송하세요.`;
             }
@@ -1762,9 +1769,11 @@
         }
 
         window.changeSpeed = function(speedValue) {
-            if (audioPlayer) { audioPlayer.playbackRate = parseFloat(speedValue); }
-            if ('speechSynthesis' in window && isSpeaking) {
-                // 음성합성은 재생 중 속도 변경이 반영되지 않으므로, 다시 시작해야 함을 안내
+            const rate = parseFloat(speedValue);
+            if (audioPlayer) { audioPlayer.playbackRate = rate; }
+            // Web Audio API 재생 중인 음원에도 실시간 배속 적용
+            if (uploadedSourceNode) {
+                uploadedSourceNode.playbackRate.value = rate;
             }
         }
 
